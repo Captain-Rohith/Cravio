@@ -1,5 +1,6 @@
 package com.javacravio.cravio.order.service;
 
+import com.javacravio.cravio.common.exception.BusinessException;
 import com.javacravio.cravio.common.exception.NotFoundException;
 import com.javacravio.cravio.order.dto.OrderItemResponse;
 import com.javacravio.cravio.order.dto.OrderResponse;
@@ -103,11 +104,59 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    public List<OrderResponse> getRestaurantOrders(Long restaurantId) {
+        if (!restaurantRepository.existsById(restaurantId)) {
+            throw new NotFoundException("Restaurant not found");
+        }
+        return orderRepository.findByRestaurantId(restaurantId).stream()
+                .map(order -> toResponse(order, orderItemRepository.findByOrderId(order.getId())))
+                .toList();
+    }
+
+    @Override
     @Transactional
     public OrderResponse updateStatus(Long orderId, OrderStatus status) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new NotFoundException("Order not found"));
         order.setStatus(status);
+        Order saved = orderRepository.save(order);
+        return toResponse(saved, orderItemRepository.findByOrderId(saved.getId()));
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse updateStatusByRestaurant(Long restaurantId, Long orderId, OrderStatus status) {
+        if (!restaurantRepository.existsById(restaurantId)) {
+            throw new NotFoundException("Restaurant not found");
+        }
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new NotFoundException("Order not found"));
+
+        if (!restaurantId.equals(order.getRestaurantId())) {
+            throw new BusinessException("Order does not belong to this restaurant");
+        }
+
+        order.setStatus(status);
+        Order saved = orderRepository.save(order);
+        return toResponse(saved, orderItemRepository.findByOrderId(saved.getId()));
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse cancelByCustomer(Long customerId, Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new NotFoundException("Order not found"));
+
+        if (!customerId.equals(order.getCustomerId())) {
+            throw new BusinessException("Order does not belong to this customer");
+        }
+
+        if (order.getStatus() == OrderStatus.DELIVERED || order.getStatus() == OrderStatus.CANCELLED) {
+            throw new BusinessException("Order cannot be cancelled in current status: " + order.getStatus());
+        }
+
+        order.setStatus(OrderStatus.CANCELLED);
         Order saved = orderRepository.save(order);
         return toResponse(saved, orderItemRepository.findByOrderId(saved.getId()));
     }

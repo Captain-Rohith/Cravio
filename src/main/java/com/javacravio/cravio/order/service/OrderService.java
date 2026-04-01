@@ -14,8 +14,13 @@ public interface OrderService {
 
     List<OrderResponse> getCustomerOrders(Long customerId);
 
+    List<OrderResponse> getRestaurantOrders(Long restaurantId);
+
     OrderResponse updateStatus(Long orderId, OrderStatus status);
+
+    OrderResponse updateStatusByRestaurant(Long restaurantId, Long orderId, OrderStatus status);
+
+    OrderResponse cancelByCustomer(Long customerId, Long orderId);
 
     OrderResponse assignDeliveryPartner(Long orderId, Long deliveryPartnerId);
 }
-

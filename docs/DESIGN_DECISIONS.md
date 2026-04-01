@@ -17,15 +17,14 @@
 - Keeps HTTP contracts stable even when persistence model changes.
 - Improves testability and limits accidental data leaks.
 
-## 3) Redis usage split by concern
+## 3) Lightweight tracking storage
 
 **Decision**:
-- Cache-aside for restaurant/menu reads.
-- GEO for delivery coordinates.
-- Pub/Sub for realtime event broadcasting.
+- Keep tracking-service state in memory and broadcast updates directly over WebSocket topics.
 
 **Why**:
-- Matches Redis strengths and avoids overusing DB for volatile location data.
+- Removes external infrastructure dependency for current scope.
+- Keeps realtime order tracking behavior available during local development.
 
 ## 4) H3 as geospatial indexing strategy
 
@@ -55,5 +54,5 @@
 
 - Shared tracking contracts are duplicated between services; a shared contract artifact is recommended.
 - Payment integration is mocked; replace with provider adapter and idempotency keys.
-- Add circuit breaker, distributed tracing, and DLQ-style handling for malformed events.
+- Add circuit breaker, distributed tracing, and durable tracking storage if horizontal scaling is needed.
 

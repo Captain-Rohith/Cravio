@@ -6,9 +6,8 @@ Realtime delivery tracking microservice for Cravio.
 
 - Accept partner location updates via REST.
 - Convert location to H3 index.
-- Store latest location in Redis GEO.
-- Publish tracking events to Redis Pub/Sub.
-- Broadcast events to users over WebSocket/STOMP.
+- Store latest location snapshot in memory.
+- Broadcast tracking events to users over WebSocket/STOMP.
 
 ## Endpoints
 
@@ -22,10 +21,7 @@ Realtime delivery tracking microservice for Cravio.
 ## Configuration
 
 - `server.port` (default `8081`)
-- `spring.data.redis.host` (default `localhost`)
-- `spring.data.redis.port` (default `6379`)
 - `cravio.h3.resolution` (default `9`)
-- `cravio.tracking.channel` (default `tracking-location-events`)
 
 ## Run locally
 

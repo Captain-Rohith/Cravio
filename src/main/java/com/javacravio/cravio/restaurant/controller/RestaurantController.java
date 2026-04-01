@@ -25,10 +25,30 @@ public class RestaurantController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RESTAURANT')")
     public ResponseEntity<ApiResponse<RestaurantResponse>> create(@Valid @RequestBody RestaurantRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Restaurant created", restaurantService.createRestaurant(request)));
+    }
+
+    @GetMapping("/{restaurantId}")
+    public ResponseEntity<ApiResponse<RestaurantResponse>> getById(@PathVariable Long restaurantId) {
+        return ResponseEntity.ok(ApiResponse.success("Restaurant fetched", restaurantService.getRestaurantById(restaurantId)));
+    }
+
+    @PutMapping("/{restaurantId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RESTAURANT')")
+    public ResponseEntity<ApiResponse<RestaurantResponse>> update(
+            @PathVariable Long restaurantId,
+            @Valid @RequestBody RestaurantRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Restaurant updated", restaurantService.updateRestaurant(restaurantId, request)));
+    }
+
+    @DeleteMapping("/{restaurantId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RESTAURANT')")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long restaurantId) {
+        restaurantService.deleteRestaurant(restaurantId);
+        return ResponseEntity.ok(ApiResponse.success("Restaurant deleted", null));
     }
 
     @GetMapping("/nearby")
@@ -39,12 +59,37 @@ public class RestaurantController {
     }
 
     @PostMapping("/{restaurantId}/menu")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RESTAURANT')")
     public ResponseEntity<ApiResponse<MenuItemResponse>> addMenuItem(
             @PathVariable Long restaurantId,
             @Valid @RequestBody MenuItemRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Menu item added", restaurantService.addMenuItem(restaurantId, request)));
+    }
+
+    @GetMapping("/{restaurantId}/menu/{menuItemId}")
+    public ResponseEntity<ApiResponse<MenuItemResponse>> getMenuItem(
+            @PathVariable Long restaurantId,
+            @PathVariable Long menuItemId) {
+        return ResponseEntity.ok(ApiResponse.success("Menu item fetched", restaurantService.getMenuItem(restaurantId, menuItemId)));
+    }
+
+    @PutMapping("/{restaurantId}/menu/{menuItemId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RESTAURANT')")
+    public ResponseEntity<ApiResponse<MenuItemResponse>> updateMenuItem(
+            @PathVariable Long restaurantId,
+            @PathVariable Long menuItemId,
+            @Valid @RequestBody MenuItemRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Menu item updated", restaurantService.updateMenuItem(restaurantId, menuItemId, request)));
+    }
+
+    @DeleteMapping("/{restaurantId}/menu/{menuItemId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RESTAURANT')")
+    public ResponseEntity<ApiResponse<Void>> deleteMenuItem(
+            @PathVariable Long restaurantId,
+            @PathVariable Long menuItemId) {
+        restaurantService.deleteMenuItem(restaurantId, menuItemId);
+        return ResponseEntity.ok(ApiResponse.success("Menu item deleted", null));
     }
 
     @GetMapping("/{restaurantId}/menu")

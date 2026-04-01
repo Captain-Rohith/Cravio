@@ -14,8 +14,7 @@ Cravio uses a **Modular Monolith + Tracking Microservice** model:
 2. **Tracking Microservice (`tracking-service`)**
    - Receives partner location updates.
    - Converts lat/lng to H3 index.
-   - Stores current location in Redis GEO.
-   - Publishes updates through Redis Pub/Sub.
+   - Stores latest order location in memory.
    - Pushes tracking events to WebSocket topics.
 
 ## Architectural principles applied
@@ -40,18 +39,12 @@ Cravio uses a **Modular Monolith + Tracking Microservice** model:
 2. Monolith forwards payload to tracking microservice.
 3. Tracking microservice:
    - computes H3 cell,
-   - writes Redis GEO key `tracking:geo:order:{orderId}`,
-   - stores partner->H3 map in `tracking:h3`,
-   - publishes event to configured tracking channel.
-4. Tracking subscriber relays event to `/topic/orders/{orderId}` over WebSocket.
+   - stores the latest event in an in-memory map,
+   - publishes event directly to `/topic/orders/{orderId}` over WebSocket.
 
 ## Infrastructure choices
 
 - **Oracle DB**: system of record for users, restaurants, orders, payments.
-- **Redis**:
-  - cache for read-heavy restaurant/menu endpoints,
-  - Pub/Sub for near-realtime tracking event fan-out,
-  - GEO for partner position lookup.
 - **H3**: location indexing for nearby restaurant lookup and tracking indexing.
 
 ## Production hardening roadmap

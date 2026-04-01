@@ -42,12 +42,38 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.success("Orders fetched", orderService.getCustomerOrders(customerId)));
     }
 
+    @PatchMapping("/customers/{customerId}/{orderId}/cancel")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<OrderResponse>> cancelByCustomer(
+            @PathVariable Long customerId,
+            @PathVariable Long orderId) {
+        return ResponseEntity.ok(ApiResponse.success("Order cancelled", orderService.cancelByCustomer(customerId, orderId)));
+    }
+
+    @GetMapping("/restaurants/{restaurantId}")
+    @PreAuthorize("hasAnyRole('RESTAURANT', 'ADMIN')")
+    public ResponseEntity<ApiResponse<List<OrderResponse>>> byRestaurant(@PathVariable Long restaurantId) {
+        return ResponseEntity.ok(ApiResponse.success("Restaurant orders fetched", orderService.getRestaurantOrders(restaurantId)));
+    }
+
     @PatchMapping("/{orderId}/status")
     @PreAuthorize("hasAnyRole('DELIVERY_PARTNER', 'ADMIN')")
     public ResponseEntity<ApiResponse<OrderResponse>> updateStatus(
             @PathVariable Long orderId,
             @RequestParam OrderStatus status) {
         return ResponseEntity.ok(ApiResponse.success("Order status updated", orderService.updateStatus(orderId, status)));
+    }
+
+    @PatchMapping("/restaurants/{restaurantId}/{orderId}/status")
+    @PreAuthorize("hasAnyRole('RESTAURANT', 'ADMIN')")
+    public ResponseEntity<ApiResponse<OrderResponse>> updateStatusByRestaurant(
+            @PathVariable Long restaurantId,
+            @PathVariable Long orderId,
+            @RequestParam OrderStatus status) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Order status updated",
+                orderService.updateStatusByRestaurant(restaurantId, orderId, status)
+        ));
     }
 
     @PatchMapping("/{orderId}/assign/{deliveryPartnerId}")
@@ -58,4 +84,3 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.success("Delivery partner assigned", orderService.assignDeliveryPartner(orderId, deliveryPartnerId)));
     }
 }
-

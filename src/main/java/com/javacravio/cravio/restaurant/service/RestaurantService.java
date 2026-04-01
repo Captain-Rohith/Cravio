@@ -11,9 +11,21 @@ public interface RestaurantService {
 
     RestaurantResponse createRestaurant(RestaurantRequest request);
 
+    RestaurantResponse getRestaurantById(Long restaurantId);
+
+    RestaurantResponse updateRestaurant(Long restaurantId, RestaurantRequest request);
+
+    void deleteRestaurant(Long restaurantId);
+
     List<RestaurantResponse> nearbyRestaurants(double latitude, double longitude);
 
     MenuItemResponse addMenuItem(Long restaurantId, MenuItemRequest request);
+
+    MenuItemResponse getMenuItem(Long restaurantId, Long menuItemId);
+
+    MenuItemResponse updateMenuItem(Long restaurantId, Long menuItemId, MenuItemRequest request);
+
+    void deleteMenuItem(Long restaurantId, Long menuItemId);
 
     List<MenuItemResponse> getMenu(Long restaurantId);
 }

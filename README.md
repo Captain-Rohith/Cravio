@@ -5,10 +5,10 @@ Cravio is a food delivery backend built with Java and Spring Boot using a **Modu
 ## What is implemented
 
 - Modular monolith with `user`, `restaurant`, `order`, `payment`, and `tracking` integration modules.
-- Tracking microservice with REST ingestion, Redis GEO storage, Redis Pub/Sub fan-out, H3 index conversion, and WebSocket push.
+- Tracking microservice with REST ingestion, H3 index conversion, in-memory latest-location snapshot, and WebSocket push.
 - JWT authentication + role-based authorization.
 - DTO-driven API responses (`ApiResponse` / `ErrorResponse`), validation, and global exception handling.
-- Redis cache-aside usage for restaurant and menu lookups.
+- Cache has been intentionally disabled for now.
 
 ## Repository layout
 
@@ -25,18 +25,14 @@ Cravio is a food delivery backend built with Java and Spring Boot using a **Modu
 - Java 21+
 - Maven wrapper (`mvnw.cmd` already included)
 - Oracle DB (or adapt datasource to another DB for local dev)
-- Redis
 
 ### 2) Configure environment variables (optional overrides)
 
 - `CRAVIO_DB_URL`
 - `CRAVIO_DB_USERNAME`
 - `CRAVIO_DB_PASSWORD`
-- `CRAVIO_REDIS_HOST`
-- `CRAVIO_REDIS_PORT`
 - `CRAVIO_JWT_SECRET`
 - `CRAVIO_TRACKING_BASE_URL`
-- `CRAVIO_TRACKING_CHANNEL`
 - `CRAVIO_H3_RESOLUTION`
 
 ### 3) Build

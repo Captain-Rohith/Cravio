@@ -1,11 +1,15 @@
 package com.javacravio.cravio.common.exception;
 
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.javacravio.cravio.common.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -46,8 +50,43 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), Map.of());
     }
 
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleUnreadable(HttpMessageNotReadableException ex, HttpServletRequest request) {
+        Throwable root = ex.getMostSpecificCause();
+        Map<String, String> fieldErrors = new HashMap<>();
+
+        if (root instanceof JsonMappingException mappingException) {
+            String field = mappingException.getPath().isEmpty() ? "payload" : mappingException.getPath().getFirst().getFieldName();
+            String message = "Invalid value";
+            if (root instanceof InvalidFormatException invalidFormatException) {
+                String targetType = invalidFormatException.getTargetType() == null
+                        ? "required type"
+                        : invalidFormatException.getTargetType().getSimpleName();
+                message = "Invalid value for " + targetType;
+            }
+            if (field == null || field.isBlank()) {
+                field = "payload";
+            }
+            fieldErrors.put(field, message);
+        }
+
+        return build(HttpStatus.BAD_REQUEST, "Invalid request payload", request.getRequestURI(), fieldErrors);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+        String field = ex.getName() == null || ex.getName().isBlank() ? "parameter" : ex.getName();
+        String expected = ex.getRequiredType() == null ? "required type" : ex.getRequiredType().getSimpleName();
+        Object provided = ex.getValue();
+
+        Map<String, String> fieldErrors = new HashMap<>();
+        fieldErrors.put(field, "Invalid value '" + provided + "' for " + expected);
+
+        return build(HttpStatus.BAD_REQUEST, "Invalid request parameter", request.getRequestURI(), fieldErrors);
+    }
+
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleUnknown(Exception ex, HttpServletRequest request) {
+    public ResponseEntity<ErrorResponse> handleUnknown(Exception ignored, HttpServletRequest request) {
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error occurred", request.getRequestURI(), Map.of());
     }
 
@@ -63,4 +102,3 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(response);
     }
 }
-
