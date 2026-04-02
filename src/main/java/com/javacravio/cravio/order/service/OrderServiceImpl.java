@@ -249,9 +249,30 @@ public class OrderServiceImpl implements OrderService {
             throw new BusinessException("Order is outside delivery partner vicinity");
         }
 
-        order.setDeliveryPartnerId(deliveryPartner.getId());
-        order.setStatus(OrderStatus.OUT_FOR_DELIVERY);
-        Order saved = orderRepository.save(order);
+        int updatedRows = orderRepository.claimOrderIfAvailable(
+                orderId,
+                deliveryPartner.getId(),
+                OrderStatus.OUT_FOR_DELIVERY,
+                DELIVERY_CLAIMABLE_STATUSES
+        );
+
+        if (updatedRows == 0) {
+            Order latest = orderRepository.findById(orderId)
+                    .orElseThrow(() -> new NotFoundException("Order not found"));
+
+            if (latest.getDeliveryPartnerId() != null) {
+                throw new BusinessException("Order was claimed by another delivery partner");
+            }
+
+            if (!DELIVERY_CLAIMABLE_STATUSES.contains(latest.getStatus())) {
+                throw new BusinessException("Order is not available for claiming in current status: " + latest.getStatus());
+            }
+
+            throw new BusinessException("Order is no longer available for claiming");
+        }
+
+        Order saved = orderRepository.findById(orderId)
+                .orElseThrow(() -> new NotFoundException("Order not found"));
         return toResponse(saved, orderItemRepository.findByOrderId(saved.getId()));
     }
 

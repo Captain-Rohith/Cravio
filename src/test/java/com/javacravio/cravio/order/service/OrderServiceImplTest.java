@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -106,19 +107,35 @@ class OrderServiceImplTest {
         order.setRestaurantId(10L);
         order.setStatus(OrderStatus.CONFIRMED);
 
+        Order claimedOrder = new Order();
+        ReflectionTestUtils.setField(claimedOrder, "id", 101L);
+        claimedOrder.setRestaurantId(10L);
+        claimedOrder.setStatus(OrderStatus.OUT_FOR_DELIVERY);
+        claimedOrder.setDeliveryPartnerId(99L);
+
         when(userRepository.findByEmail("rider@cravio.com")).thenReturn(Optional.of(deliveryPartner));
-        when(orderRepository.findById(101L)).thenReturn(Optional.of(order));
+        when(orderRepository.findById(101L)).thenReturn(Optional.of(order), Optional.of(claimedOrder));
         when(restaurantRepository.findById(10L)).thenReturn(Optional.of(restaurant));
         when(h3Utils.toCell(12.9716, 77.5946)).thenReturn("cell-driver");
         when(h3Utils.nearbyCells("cell-driver", anyInt())).thenReturn(Set.of("cell-driver", "cell-restaurant"));
-        when(orderRepository.save(order)).thenReturn(order);
+        when(orderRepository.claimOrderIfAvailable(
+                eq(101L),
+                eq(99L),
+                eq(OrderStatus.OUT_FOR_DELIVERY),
+                eq(Set.of(OrderStatus.CONFIRMED, OrderStatus.PREPARING))
+        )).thenReturn(1);
         when(orderItemRepository.findByOrderId(101L)).thenReturn(List.of());
 
         var claimed = orderService.claimOrder(101L, "rider@cravio.com", 12.9716, 77.5946);
 
         assertEquals(99L, claimed.deliveryPartnerId());
         assertEquals(OrderStatus.OUT_FOR_DELIVERY, claimed.status());
-        verify(orderRepository).save(order);
+        verify(orderRepository).claimOrderIfAvailable(
+                eq(101L),
+                eq(99L),
+                eq(OrderStatus.OUT_FOR_DELIVERY),
+                eq(Set.of(OrderStatus.CONFIRMED, OrderStatus.PREPARING))
+        );
     }
 
     @Test
@@ -161,6 +178,43 @@ class OrderServiceImplTest {
         when(orderRepository.findById(101L)).thenReturn(Optional.empty());
 
         assertThrows(NotFoundException.class,
+                () -> orderService.claimOrder(101L, "rider@cravio.com", 12.9716, 77.5946));
+    }
+
+    @Test
+    void claimOrderShouldThrowWhenAnotherPartnerClaimsFirst() {
+        User deliveryPartner = new User();
+        ReflectionTestUtils.setField(deliveryPartner, "id", 99L);
+        deliveryPartner.setRole(Role.DELIVERY_PARTNER);
+
+        Restaurant restaurant = new Restaurant();
+        ReflectionTestUtils.setField(restaurant, "id", 10L);
+        restaurant.setH3Index("cell-restaurant");
+
+        Order order = new Order();
+        ReflectionTestUtils.setField(order, "id", 101L);
+        order.setRestaurantId(10L);
+        order.setStatus(OrderStatus.CONFIRMED);
+
+        Order alreadyClaimed = new Order();
+        ReflectionTestUtils.setField(alreadyClaimed, "id", 101L);
+        alreadyClaimed.setRestaurantId(10L);
+        alreadyClaimed.setStatus(OrderStatus.OUT_FOR_DELIVERY);
+        alreadyClaimed.setDeliveryPartnerId(55L);
+
+        when(userRepository.findByEmail("rider@cravio.com")).thenReturn(Optional.of(deliveryPartner));
+        when(orderRepository.findById(101L)).thenReturn(Optional.of(order), Optional.of(alreadyClaimed));
+        when(restaurantRepository.findById(10L)).thenReturn(Optional.of(restaurant));
+        when(h3Utils.toCell(12.9716, 77.5946)).thenReturn("cell-driver");
+        when(h3Utils.nearbyCells("cell-driver", anyInt())).thenReturn(Set.of("cell-driver", "cell-restaurant"));
+        when(orderRepository.claimOrderIfAvailable(
+                eq(101L),
+                eq(99L),
+                eq(OrderStatus.OUT_FOR_DELIVERY),
+                eq(Set.of(OrderStatus.CONFIRMED, OrderStatus.PREPARING))
+        )).thenReturn(0);
+
+        assertThrows(BusinessException.class,
                 () -> orderService.claimOrder(101L, "rider@cravio.com", 12.9716, 77.5946));
     }
 }

@@ -20,6 +20,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -56,11 +57,32 @@ class UserServiceImplTest {
     }
 
     @Test
+    void registerShouldNormalizeEmailBeforeLookup() {
+        when(userRepository.findByEmail("john@cravio.com")).thenReturn(Optional.of(user));
+
+        assertThrows(BusinessException.class, () -> userService.register(new RegisterRequest(
+                "  JOHN@CRAVIO.COM  ", "password123", "John", Role.CUSTOMER
+        )));
+    }
+
+    @Test
     void loginShouldThrowForInvalidPassword() {
         when(userRepository.findByEmail("john@cravio.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("wrong", "encoded")).thenReturn(false);
 
         assertThrows(UnauthorizedException.class, () -> userService.login(new LoginRequest("john@cravio.com", "wrong")));
+    }
+
+    @Test
+    void loginShouldNormalizeEmailBeforeLookup() {
+        when(userRepository.findByEmail("john@cravio.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("password", "encoded")).thenReturn(true);
+        when(jwtService.generateToken(any(), any())).thenReturn("jwt-token");
+
+        var response = userService.login(new LoginRequest("  JOHN@CRAVIO.COM  ", "password"));
+
+        assertEquals("jwt-token", response.token());
+        verify(userRepository).findByEmail(eq("john@cravio.com"));
     }
 
     @Test
@@ -73,6 +95,21 @@ class UserServiceImplTest {
 
         assertEquals("jwt-token", response.token());
         assertEquals("john@cravio.com", response.user().email());
+    }
+
+    @Test
+    void loginShouldMigrateLegacyPlaintextPassword() {
+        user.setPassword("password");
+        when(userRepository.findByEmail("john@cravio.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("password", "password")).thenReturn(false);
+        when(passwordEncoder.encode("password")).thenReturn("encoded");
+        when(jwtService.generateToken(any(), any())).thenReturn("jwt-token");
+
+        var response = userService.login(new LoginRequest("john@cravio.com", "password"));
+
+        assertEquals("jwt-token", response.token());
+        verify(userRepository).save(user);
+        assertEquals("encoded", user.getPassword());
     }
 }
 

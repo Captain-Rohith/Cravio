@@ -12,6 +12,8 @@ import com.javacravio.cravio.user.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.Locale;
+
 @Service
 public class UserServiceImpl implements UserService {
 
@@ -27,12 +29,14 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserResponse register(RegisterRequest request) {
-        if (userRepository.findByEmail(request.email()).isPresent()) {
+        String normalizedEmail = normalizeEmail(request.email());
+
+        if (userRepository.findByEmail(normalizedEmail).isPresent()) {
             throw new BusinessException("Email already exists");
         }
 
         User user = new User();
-        user.setEmail(request.email());
+        user.setEmail(normalizedEmail);
         user.setPassword(passwordEncoder.encode(request.password()));
         user.setFullName(request.fullName());
         user.setRole(request.role());
@@ -43,15 +47,29 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.email())
+        String normalizedEmail = normalizeEmail(request.email());
+
+        User user = userRepository.findByEmail(normalizedEmail)
                 .orElseThrow(() -> new UnauthorizedException("Invalid credentials"));
 
-        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+        boolean validPassword = passwordEncoder.matches(request.password(), user.getPassword());
+        if (!validPassword && request.password().equals(user.getPassword())) {
+            // One-time migration path for any legacy plaintext password rows.
+            user.setPassword(passwordEncoder.encode(request.password()));
+            userRepository.save(user);
+            validPassword = true;
+        }
+
+        if (!validPassword) {
             throw new UnauthorizedException("Invalid credentials");
         }
 
         String token = jwtService.generateToken(user.getEmail(), user.getRole());
         return new AuthResponse(token, new UserResponse(user.getId(), user.getEmail(), user.getFullName(), user.getRole()));
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
     }
 }
 
