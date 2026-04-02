@@ -39,6 +39,7 @@ import java.util.stream.Collectors;
 public class OrderServiceImpl implements OrderService {
 
     private static final Set<OrderStatus> DELIVERY_CLAIMABLE_STATUSES = Set.of(OrderStatus.CONFIRMED, OrderStatus.PREPARING);
+    private static final double EARTH_RADIUS_KM = 6371.0;
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
@@ -48,6 +49,7 @@ public class OrderServiceImpl implements OrderService {
     private final PaymentService paymentService;
     private final H3Utils h3Utils;
     private final int deliveryDiscoveryRingSize;
+    private final double deliveryDiscoveryRadiusKm;
 
     public OrderServiceImpl(
             OrderRepository orderRepository,
@@ -57,7 +59,8 @@ public class OrderServiceImpl implements OrderService {
             UserRepository userRepository,
             PaymentService paymentService,
             H3Utils h3Utils,
-            @Value("${cravio.delivery.discovery-ring-size:2}") int deliveryDiscoveryRingSize) {
+            @Value("${cravio.delivery.discovery-ring-size:2}") int deliveryDiscoveryRingSize,
+            @Value("${cravio.delivery.discovery-radius-km:5.0}") double deliveryDiscoveryRadiusKm) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.restaurantRepository = restaurantRepository;
@@ -66,6 +69,7 @@ public class OrderServiceImpl implements OrderService {
         this.paymentService = paymentService;
         this.h3Utils = h3Utils;
         this.deliveryDiscoveryRingSize = Math.max(0, deliveryDiscoveryRingSize);
+        this.deliveryDiscoveryRadiusKm = Math.max(0.1, deliveryDiscoveryRadiusKm);
     }
 
     @Override
@@ -141,10 +145,23 @@ public class OrderServiceImpl implements OrderService {
             return List.of();
         }
 
-        Map<Long, Restaurant> nearbyRestaurantsById = nearbyRestaurants.stream()
+        List<Restaurant> radiusFilteredRestaurants = nearbyRestaurants.stream()
+                .filter(restaurant -> isWithinDiscoveryRadius(
+                        latitude,
+                        longitude,
+                        restaurant.getLatitude(),
+                        restaurant.getLongitude()
+                ))
+                .toList();
+
+        if (radiusFilteredRestaurants.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, Restaurant> nearbyRestaurantsById = radiusFilteredRestaurants.stream()
                 .collect(Collectors.toMap(Restaurant::getId, Function.identity()));
 
-        List<Long> nearbyRestaurantIds = nearbyRestaurants.stream()
+        List<Long> nearbyRestaurantIds = radiusFilteredRestaurants.stream()
                 .map(Restaurant::getId)
                 .toList();
 
@@ -243,6 +260,10 @@ public class OrderServiceImpl implements OrderService {
         Restaurant pickupRestaurant = restaurantRepository.findById(order.getRestaurantId())
                 .orElseThrow(() -> new NotFoundException("Restaurant not found"));
 
+        if (!isWithinDiscoveryRadius(latitude, longitude, pickupRestaurant.getLatitude(), pickupRestaurant.getLongitude())) {
+            throw new BusinessException("Order is outside delivery partner radius");
+        }
+
         String deliveryPartnerCell = h3Utils.toCell(latitude, longitude);
         Set<String> allowedCells = h3Utils.nearbyCells(deliveryPartnerCell, deliveryDiscoveryRingSize);
         if (!allowedCells.contains(pickupRestaurant.getH3Index())) {
@@ -311,6 +332,33 @@ public class OrderServiceImpl implements OrderService {
         return items.stream()
                 .map(item -> new OrderItemResponse(item.getMenuItemId(), item.getQuantity(), item.getUnitPrice()))
                 .toList();
+    }
+
+    private boolean isWithinDiscoveryRadius(
+            double originLatitude,
+            double originLongitude,
+            double targetLatitude,
+            double targetLongitude) {
+        return distanceKm(originLatitude, originLongitude, targetLatitude, targetLongitude) <= deliveryDiscoveryRadiusKm;
+    }
+
+    private double distanceKm(
+            double originLatitude,
+            double originLongitude,
+            double targetLatitude,
+            double targetLongitude) {
+        double lat1Rad = Math.toRadians(originLatitude);
+        double lon1Rad = Math.toRadians(originLongitude);
+        double lat2Rad = Math.toRadians(targetLatitude);
+        double lon2Rad = Math.toRadians(targetLongitude);
+
+        double deltaLat = lat2Rad - lat1Rad;
+        double deltaLon = lon2Rad - lon1Rad;
+
+        double a = Math.pow(Math.sin(deltaLat / 2), 2)
+                + Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.pow(Math.sin(deltaLon / 2), 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return EARTH_RADIUS_KM * c;
     }
 }
 

@@ -34,6 +34,8 @@ Cravio is a food delivery backend built with Java and Spring Boot using a **Modu
 - `CRAVIO_JWT_SECRET`
 - `CRAVIO_TRACKING_BASE_URL`
 - `CRAVIO_H3_RESOLUTION`
+- `CRAVIO_DELIVERY_DISCOVERY_RING_SIZE`
+- `CRAVIO_DELIVERY_DISCOVERY_RADIUS_KM`
 
 ### 3) Build
 

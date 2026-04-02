@@ -81,6 +81,7 @@ Base URLs:
    - `GET /api/v1/orders/available/nearby?latitude={lat}&longitude={lng}` (`DELIVERY_PARTNER`)
    - `PATCH /api/v1/orders/{orderId}/claim?latitude={lat}&longitude={lng}` (`DELIVERY_PARTNER`)
    - `PATCH /api/v1/orders/{orderId}/status?status={ORDER_STATUS}` (`DELIVERY_PARTNER`, `ADMIN`)
+   - Only orders within configured discovery radius are visible/claimable (`cravio.delivery.discovery-radius-km`).
 
 ## Core Monolith APIs (`/api/v1`)
 
@@ -148,9 +149,9 @@ Menu item payload:
 - `PATCH /orders/restaurants/{restaurantId}/{orderId}/status?status={ORDER_STATUS}` (`RESTAURANT`, `ADMIN`)
   - Restaurant updates order status for its own order.
 - `GET /orders/available/nearby?latitude={lat}&longitude={lng}` (`DELIVERY_PARTNER`)
-  - Returns unassigned orders in nearby H3 cells, including pickup restaurant details.
+  - Returns unassigned orders in nearby H3 cells and within configured radius, including pickup restaurant details.
 - `PATCH /orders/{orderId}/claim?latitude={lat}&longitude={lng}` (`DELIVERY_PARTNER`)
-  - Lets the logged-in delivery partner self-claim a nearby order.
+  - Lets the logged-in delivery partner self-claim a nearby order if still unclaimed and within configured radius.
 - `PATCH /orders/{orderId}/status?status={ORDER_STATUS}` (`DELIVERY_PARTNER`, `ADMIN`)
   - Updates order status.
 

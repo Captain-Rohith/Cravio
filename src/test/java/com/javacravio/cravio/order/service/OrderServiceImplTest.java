@@ -16,6 +16,7 @@ import com.javacravio.cravio.user.model.Role;
 import com.javacravio.cravio.user.model.User;
 import com.javacravio.cravio.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -54,6 +55,12 @@ class OrderServiceImplTest {
 
     @InjectMocks
     private OrderServiceImpl orderService;
+
+    @BeforeEach
+    void configureDiscoveryDefaults() {
+        ReflectionTestUtils.setField(orderService, "deliveryDiscoveryRingSize", 2);
+        ReflectionTestUtils.setField(orderService, "deliveryDiscoveryRadiusKm", 5.0);
+    }
 
     @Test
     void getNearbyAvailableOrdersShouldReturnUnassignedOrdersInVicinity() {
@@ -101,6 +108,8 @@ class OrderServiceImplTest {
         Restaurant restaurant = new Restaurant();
         ReflectionTestUtils.setField(restaurant, "id", 10L);
         restaurant.setH3Index("cell-restaurant");
+        restaurant.setLatitude(12.9720);
+        restaurant.setLongitude(77.5940);
 
         Order order = new Order();
         ReflectionTestUtils.setField(order, "id", 101L);
@@ -145,6 +154,8 @@ class OrderServiceImplTest {
 
         Restaurant restaurant = new Restaurant();
         restaurant.setH3Index("cell-restaurant");
+        restaurant.setLatitude(12.9720);
+        restaurant.setLongitude(77.5940);
 
         Order order = new Order();
         order.setRestaurantId(10L);
@@ -190,6 +201,8 @@ class OrderServiceImplTest {
         Restaurant restaurant = new Restaurant();
         ReflectionTestUtils.setField(restaurant, "id", 10L);
         restaurant.setH3Index("cell-restaurant");
+        restaurant.setLatitude(12.9720);
+        restaurant.setLongitude(77.5940);
 
         Order order = new Order();
         ReflectionTestUtils.setField(order, "id", 101L);
@@ -213,6 +226,59 @@ class OrderServiceImplTest {
                 eq(OrderStatus.OUT_FOR_DELIVERY),
                 eq(Set.of(OrderStatus.CONFIRMED, OrderStatus.PREPARING))
         )).thenReturn(0);
+
+        assertThrows(BusinessException.class,
+                () -> orderService.claimOrder(101L, "rider@cravio.com", 12.9716, 77.5946));
+    }
+
+    @Test
+    void getNearbyAvailableOrdersShouldExcludeRestaurantsOutsideRadius() {
+        Restaurant farRestaurant = new Restaurant();
+        ReflectionTestUtils.setField(farRestaurant, "id", 20L);
+        farRestaurant.setName("Far Away Kitchen");
+        farRestaurant.setLatitude(13.2000);
+        farRestaurant.setLongitude(77.9000);
+        farRestaurant.setH3Index("cell-restaurant-far");
+
+        Order farOrder = new Order();
+        ReflectionTestUtils.setField(farOrder, "id", 202L);
+        farOrder.setCustomerId(2L);
+        farOrder.setRestaurantId(20L);
+        farOrder.setStatus(OrderStatus.CONFIRMED);
+
+        when(h3Utils.toCell(12.9716, 77.5946)).thenReturn("cell-driver");
+        when(h3Utils.nearbyCells("cell-driver", anyInt())).thenReturn(Set.of("cell-driver", "cell-restaurant-far"));
+        when(restaurantRepository.findByH3IndexIn(anySet())).thenReturn(List.of(farRestaurant));
+        when(orderRepository.findByRestaurantIdInAndDeliveryPartnerIdIsNullAndStatusIn(List.of(20L), Set.of(OrderStatus.CONFIRMED, OrderStatus.PREPARING)))
+                .thenReturn(List.of(farOrder));
+
+        var nearby = orderService.getNearbyAvailableOrders(12.9716, 77.5946);
+
+        assertEquals(0, nearby.size());
+    }
+
+    @Test
+    void claimOrderShouldRejectWhenOutsideRadiusEvenIfVicinityMatches() {
+        User deliveryPartner = new User();
+        ReflectionTestUtils.setField(deliveryPartner, "id", 99L);
+        deliveryPartner.setRole(Role.DELIVERY_PARTNER);
+
+        Restaurant farRestaurant = new Restaurant();
+        ReflectionTestUtils.setField(farRestaurant, "id", 10L);
+        farRestaurant.setH3Index("cell-restaurant");
+        farRestaurant.setLatitude(13.2000);
+        farRestaurant.setLongitude(77.9000);
+
+        Order order = new Order();
+        ReflectionTestUtils.setField(order, "id", 101L);
+        order.setRestaurantId(10L);
+        order.setStatus(OrderStatus.CONFIRMED);
+
+        when(userRepository.findByEmail("rider@cravio.com")).thenReturn(Optional.of(deliveryPartner));
+        when(orderRepository.findById(101L)).thenReturn(Optional.of(order));
+        when(restaurantRepository.findById(10L)).thenReturn(Optional.of(farRestaurant));
+        when(h3Utils.toCell(12.9716, 77.5946)).thenReturn("cell-driver");
+        when(h3Utils.nearbyCells("cell-driver", anyInt())).thenReturn(Set.of("cell-driver", "cell-restaurant"));
 
         assertThrows(BusinessException.class,
                 () -> orderService.claimOrder(101L, "rider@cravio.com", 12.9716, 77.5946));
