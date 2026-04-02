@@ -36,12 +36,7 @@ public class OracleRoleConstraintInitializer {
 
         try {
             // Replace any legacy role check so RESTAURANT/DELIVERY_PARTNER values are accepted.
-            List<String> constraintNames = jdbcTemplate.queryForList(
-                    "SELECT constraint_name FROM user_constraints " +
-                            "WHERE table_name = 'USERS' AND constraint_type = 'C' " +
-                            "AND UPPER(search_condition_vc) LIKE '%ROLE%'",
-                    String.class
-            );
+            List<String> constraintNames = findRoleRelatedCheckConstraints();
 
             for (String constraintName : constraintNames) {
                 jdbcTemplate.execute("ALTER TABLE users DROP CONSTRAINT " + constraintName);
@@ -52,6 +47,34 @@ public class OracleRoleConstraintInitializer {
         } catch (Exception ex) {
             log.warn("Could not update users.role check constraint automatically: {}", ex.getMessage());
         }
+    }
+
+    private List<String> findRoleRelatedCheckConstraints() {
+        if (hasSearchConditionVcColumn()) {
+            return jdbcTemplate.queryForList(
+                    "SELECT constraint_name FROM user_constraints " +
+                            "WHERE table_name = 'USERS' AND constraint_type = 'C' " +
+                            "AND UPPER(search_condition_vc) LIKE '%ROLE%'",
+                    String.class
+            );
+        }
+
+        // Older Oracle versions may not expose SEARCH_CONDITION_VC.
+        return jdbcTemplate.queryForList(
+                "SELECT constraint_name FROM user_constraints " +
+                        "WHERE table_name = 'USERS' AND constraint_type = 'C' " +
+                        "AND constraint_name = 'CK_USERS_ROLE'",
+                String.class
+        );
+    }
+
+    private boolean hasSearchConditionVcColumn() {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM user_tab_columns " +
+                        "WHERE table_name = 'USER_CONSTRAINTS' AND column_name = 'SEARCH_CONDITION_VC'",
+                Integer.class
+        );
+        return count != null && count > 0;
     }
 
     private boolean usersTableExists() {

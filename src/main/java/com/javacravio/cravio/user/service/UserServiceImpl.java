@@ -27,7 +27,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserResponse register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.email())) {
+        if (userRepository.findByEmail(request.email()).isPresent()) {
             throw new BusinessException("Email already exists");
         }
 

@@ -1,6 +1,7 @@
 package com.javacravio.cravio.order.controller;
 
 import com.javacravio.cravio.common.dto.ApiResponse;
+import com.javacravio.cravio.order.dto.NearbyOrderResponse;
 import com.javacravio.cravio.order.dto.OrderResponse;
 import com.javacravio.cravio.order.dto.PlaceOrderRequest;
 import com.javacravio.cravio.order.model.OrderStatus;
@@ -9,6 +10,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -56,6 +58,30 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.success("Restaurant orders fetched", orderService.getRestaurantOrders(restaurantId)));
     }
 
+    @GetMapping("/available/nearby")
+    @PreAuthorize("hasRole('DELIVERY_PARTNER')")
+    public ResponseEntity<ApiResponse<List<NearbyOrderResponse>>> nearbyAvailableOrders(
+            @RequestParam double latitude,
+            @RequestParam double longitude) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Nearby available orders fetched",
+                orderService.getNearbyAvailableOrders(latitude, longitude)
+        ));
+    }
+
+    @PatchMapping("/{orderId}/claim")
+    @PreAuthorize("hasRole('DELIVERY_PARTNER')")
+    public ResponseEntity<ApiResponse<OrderResponse>> claimOrder(
+            @PathVariable Long orderId,
+            @RequestParam double latitude,
+            @RequestParam double longitude,
+            Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Order claimed",
+                orderService.claimOrder(orderId, authentication.getName(), latitude, longitude)
+        ));
+    }
+
     @PatchMapping("/{orderId}/status")
     @PreAuthorize("hasAnyRole('DELIVERY_PARTNER', 'ADMIN')")
     public ResponseEntity<ApiResponse<OrderResponse>> updateStatus(
@@ -76,11 +102,4 @@ public class OrderController {
         ));
     }
 
-    @PatchMapping("/{orderId}/assign/{deliveryPartnerId}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<OrderResponse>> assign(
-            @PathVariable Long orderId,
-            @PathVariable Long deliveryPartnerId) {
-        return ResponseEntity.ok(ApiResponse.success("Delivery partner assigned", orderService.assignDeliveryPartner(orderId, deliveryPartnerId)));
-    }
 }

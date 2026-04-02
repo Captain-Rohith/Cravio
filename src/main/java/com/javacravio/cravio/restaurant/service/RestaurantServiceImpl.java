@@ -62,7 +62,7 @@ public class RestaurantServiceImpl implements RestaurantService {
     @Override
     @Transactional
     public void deleteRestaurant(Long restaurantId) {
-        if (!restaurantRepository.existsById(restaurantId)) {
+        if (restaurantRepository.findById(restaurantId).isEmpty()) {
             throw new NotFoundException("Restaurant not found");
         }
         menuItemRepository.deleteByRestaurantId(restaurantId);
@@ -111,7 +111,7 @@ public class RestaurantServiceImpl implements RestaurantService {
 
     @Override
     public List<MenuItemResponse> getMenu(Long restaurantId) {
-        if (!restaurantRepository.existsById(restaurantId)) {
+        if (restaurantRepository.findById(restaurantId).isEmpty()) {
             throw new NotFoundException("Restaurant not found");
         }
         return menuItemRepository.findByRestaurantId(restaurantId).stream()
@@ -120,7 +120,7 @@ public class RestaurantServiceImpl implements RestaurantService {
     }
 
     private MenuItem getMenuItemEntity(Long restaurantId, Long menuItemId) {
-        if (!restaurantRepository.existsById(restaurantId)) {
+        if (restaurantRepository.findById(restaurantId).isEmpty()) {
             throw new NotFoundException("Restaurant not found");
         }
         return menuItemRepository.findByIdAndRestaurantId(menuItemId, restaurantId)

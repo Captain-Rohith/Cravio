@@ -58,7 +58,7 @@ class RestaurantServiceImplTest {
 
     @Test
     void deleteRestaurantShouldDeleteMenuItemsBeforeRestaurant() {
-        when(restaurantRepository.existsById(10L)).thenReturn(true);
+        when(restaurantRepository.findById(10L)).thenReturn(Optional.of(new Restaurant()));
 
         restaurantService.deleteRestaurant(10L);
 
@@ -69,7 +69,7 @@ class RestaurantServiceImplTest {
 
     @Test
     void updateMenuItemShouldThrowWhenMenuItemMissing() {
-        when(restaurantRepository.existsById(5L)).thenReturn(true);
+        when(restaurantRepository.findById(5L)).thenReturn(Optional.of(new Restaurant()));
         when(menuItemRepository.findByIdAndRestaurantId(9L, 5L)).thenReturn(Optional.empty());
 
         assertThrows(NotFoundException.class,

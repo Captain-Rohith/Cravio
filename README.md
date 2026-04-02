@@ -46,7 +46,7 @@ Set-Location "C:\Users\rohit\IdeaProjects\Cravio"
 ### 4) Run services
 
 ```powershell
-# terminal 1 - core monolith (port 8080)
+# terminal 1 - core monolith (port 8090)
 Set-Location "C:\Users\rohit\IdeaProjects\Cravio"
 .\mvnw.cmd spring-boot:run
 

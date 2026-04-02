@@ -32,6 +32,7 @@ Cravio uses a **Modular Monolith + Tracking Microservice** model:
 2. Order service validates customer/restaurant/items.
 3. Payment service is invoked transactionally.
 4. Order status transitions to `CONFIRMED` or `CANCELLED`.
+5. Delivery partner discovers nearby unassigned orders using H3 vicinity and self-claims orders.
 
 ### Tracking flow
 

@@ -48,7 +48,7 @@ class UserServiceImplTest {
 
     @Test
     void registerShouldThrowWhenEmailExists() {
-        when(userRepository.existsByEmail("john@cravio.com")).thenReturn(true);
+        when(userRepository.findByEmail("john@cravio.com")).thenReturn(Optional.of(user));
 
         assertThrows(BusinessException.class, () -> userService.register(new RegisterRequest(
                 "john@cravio.com", "password123", "John", Role.CUSTOMER

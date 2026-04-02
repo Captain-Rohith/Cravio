@@ -2,7 +2,7 @@
 
 Base URLs:
 
-- Core monolith: `http://localhost:8080`
+- Core monolith: `http://localhost:8090`
 - Tracking service: `http://localhost:8081`
 
 ## Authentication
@@ -77,8 +77,9 @@ Base URLs:
    - `GET /api/v1/orders/restaurants/{restaurantId}` (`RESTAURANT`, `ADMIN`)
    - `PATCH /api/v1/orders/restaurants/{restaurantId}/{orderId}/status?status={ORDER_STATUS}` (`RESTAURANT`, `ADMIN`)
 
-8. Delivery assignment and delivery updates
-   - `PATCH /api/v1/orders/{orderId}/assign/{deliveryPartnerId}` (`ADMIN`)
+8. Delivery partner order discovery and claiming
+   - `GET /api/v1/orders/available/nearby?latitude={lat}&longitude={lng}` (`DELIVERY_PARTNER`)
+   - `PATCH /api/v1/orders/{orderId}/claim?latitude={lat}&longitude={lng}` (`DELIVERY_PARTNER`)
    - `PATCH /api/v1/orders/{orderId}/status?status={ORDER_STATUS}` (`DELIVERY_PARTNER`, `ADMIN`)
 
 ## Core Monolith APIs (`/api/v1`)
@@ -146,10 +147,12 @@ Menu item payload:
   - Fetches orders for a restaurant.
 - `PATCH /orders/restaurants/{restaurantId}/{orderId}/status?status={ORDER_STATUS}` (`RESTAURANT`, `ADMIN`)
   - Restaurant updates order status for its own order.
+- `GET /orders/available/nearby?latitude={lat}&longitude={lng}` (`DELIVERY_PARTNER`)
+  - Returns unassigned orders in nearby H3 cells, including pickup restaurant details.
+- `PATCH /orders/{orderId}/claim?latitude={lat}&longitude={lng}` (`DELIVERY_PARTNER`)
+  - Lets the logged-in delivery partner self-claim a nearby order.
 - `PATCH /orders/{orderId}/status?status={ORDER_STATUS}` (`DELIVERY_PARTNER`, `ADMIN`)
   - Updates order status.
-- `PATCH /orders/{orderId}/assign/{deliveryPartnerId}` (`ADMIN`)
-  - Assigns delivery partner.
 
 ### Payments
 

@@ -2,6 +2,8 @@ package com.javacravio.cravio.order.service;
 
 import com.javacravio.cravio.common.exception.BusinessException;
 import com.javacravio.cravio.common.exception.NotFoundException;
+import com.javacravio.cravio.common.utils.H3Utils;
+import com.javacravio.cravio.order.dto.NearbyOrderResponse;
 import com.javacravio.cravio.order.dto.OrderItemResponse;
 import com.javacravio.cravio.order.dto.OrderResponse;
 import com.javacravio.cravio.order.dto.PlaceOrderItemRequest;
@@ -16,17 +18,27 @@ import com.javacravio.cravio.payment.dto.PaymentResponse;
 import com.javacravio.cravio.payment.model.PaymentStatus;
 import com.javacravio.cravio.payment.service.PaymentService;
 import com.javacravio.cravio.restaurant.model.MenuItem;
+import com.javacravio.cravio.restaurant.model.Restaurant;
 import com.javacravio.cravio.restaurant.repository.MenuItemRepository;
 import com.javacravio.cravio.restaurant.repository.RestaurantRepository;
+import com.javacravio.cravio.user.model.Role;
+import com.javacravio.cravio.user.model.User;
 import com.javacravio.cravio.user.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class OrderServiceImpl implements OrderService {
+
+    private static final Set<OrderStatus> DELIVERY_CLAIMABLE_STATUSES = Set.of(OrderStatus.CONFIRMED, OrderStatus.PREPARING);
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
@@ -34,6 +46,8 @@ public class OrderServiceImpl implements OrderService {
     private final MenuItemRepository menuItemRepository;
     private final UserRepository userRepository;
     private final PaymentService paymentService;
+    private final H3Utils h3Utils;
+    private final int deliveryDiscoveryRingSize;
 
     public OrderServiceImpl(
             OrderRepository orderRepository,
@@ -41,22 +55,26 @@ public class OrderServiceImpl implements OrderService {
             RestaurantRepository restaurantRepository,
             MenuItemRepository menuItemRepository,
             UserRepository userRepository,
-            PaymentService paymentService) {
+            PaymentService paymentService,
+            H3Utils h3Utils,
+            @Value("${cravio.delivery.discovery-ring-size:2}") int deliveryDiscoveryRingSize) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.restaurantRepository = restaurantRepository;
         this.menuItemRepository = menuItemRepository;
         this.userRepository = userRepository;
         this.paymentService = paymentService;
+        this.h3Utils = h3Utils;
+        this.deliveryDiscoveryRingSize = Math.max(0, deliveryDiscoveryRingSize);
     }
 
     @Override
     @Transactional
     public OrderResponse placeOrder(PlaceOrderRequest request) {
-        if (!userRepository.existsById(request.customerId())) {
+        if (userRepository.findById(request.customerId()).isEmpty()) {
             throw new NotFoundException("Customer not found");
         }
-        if (!restaurantRepository.existsById(request.restaurantId())) {
+        if (restaurantRepository.findById(request.restaurantId()).isEmpty()) {
             throw new NotFoundException("Restaurant not found");
         }
 
@@ -105,11 +123,37 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public List<OrderResponse> getRestaurantOrders(Long restaurantId) {
-        if (!restaurantRepository.existsById(restaurantId)) {
+        if (restaurantRepository.findById(restaurantId).isEmpty()) {
             throw new NotFoundException("Restaurant not found");
         }
         return orderRepository.findByRestaurantId(restaurantId).stream()
                 .map(order -> toResponse(order, orderItemRepository.findByOrderId(order.getId())))
+                .toList();
+    }
+
+    @Override
+    public List<NearbyOrderResponse> getNearbyAvailableOrders(double latitude, double longitude) {
+        String currentCell = h3Utils.toCell(latitude, longitude);
+        Set<String> nearbyCells = h3Utils.nearbyCells(currentCell, deliveryDiscoveryRingSize);
+
+        List<Restaurant> nearbyRestaurants = restaurantRepository.findByH3IndexIn(nearbyCells);
+        if (nearbyRestaurants.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, Restaurant> nearbyRestaurantsById = nearbyRestaurants.stream()
+                .collect(Collectors.toMap(Restaurant::getId, Function.identity()));
+
+        List<Long> nearbyRestaurantIds = nearbyRestaurants.stream()
+                .map(Restaurant::getId)
+                .toList();
+
+        return orderRepository.findByRestaurantIdInAndDeliveryPartnerIdIsNullAndStatusIn(nearbyRestaurantIds, DELIVERY_CLAIMABLE_STATUSES)
+                .stream()
+                .map(order -> {
+                    Restaurant pickupRestaurant = nearbyRestaurantsById.get(order.getRestaurantId());
+                    return toNearbyOrderResponse(order, orderItemRepository.findByOrderId(order.getId()), pickupRestaurant);
+                })
                 .toList();
     }
 
@@ -126,7 +170,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderResponse updateStatusByRestaurant(Long restaurantId, Long orderId, OrderStatus status) {
-        if (!restaurantRepository.existsById(restaurantId)) {
+        if (restaurantRepository.findById(restaurantId).isEmpty()) {
             throw new NotFoundException("Restaurant not found");
         }
 
@@ -164,7 +208,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderResponse assignDeliveryPartner(Long orderId, Long deliveryPartnerId) {
-        if (!userRepository.existsById(deliveryPartnerId)) {
+        if (userRepository.findById(deliveryPartnerId).isEmpty()) {
             throw new NotFoundException("Delivery partner not found");
         }
         Order order = orderRepository.findById(orderId)
@@ -175,10 +219,44 @@ public class OrderServiceImpl implements OrderService {
         return toResponse(saved, orderItemRepository.findByOrderId(saved.getId()));
     }
 
+    @Override
+    @Transactional
+    public OrderResponse claimOrder(Long orderId, String deliveryPartnerEmail, double latitude, double longitude) {
+        User deliveryPartner = userRepository.findByEmail(deliveryPartnerEmail)
+                .orElseThrow(() -> new NotFoundException("Delivery partner not found"));
+
+        if (deliveryPartner.getRole() != Role.DELIVERY_PARTNER) {
+            throw new BusinessException("Only delivery partners can claim orders");
+        }
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new NotFoundException("Order not found"));
+
+        if (order.getDeliveryPartnerId() != null) {
+            throw new BusinessException("Order is already claimed");
+        }
+
+        if (!DELIVERY_CLAIMABLE_STATUSES.contains(order.getStatus())) {
+            throw new BusinessException("Order is not available for claiming in current status: " + order.getStatus());
+        }
+
+        Restaurant pickupRestaurant = restaurantRepository.findById(order.getRestaurantId())
+                .orElseThrow(() -> new NotFoundException("Restaurant not found"));
+
+        String deliveryPartnerCell = h3Utils.toCell(latitude, longitude);
+        Set<String> allowedCells = h3Utils.nearbyCells(deliveryPartnerCell, deliveryDiscoveryRingSize);
+        if (!allowedCells.contains(pickupRestaurant.getH3Index())) {
+            throw new BusinessException("Order is outside delivery partner vicinity");
+        }
+
+        order.setDeliveryPartnerId(deliveryPartner.getId());
+        order.setStatus(OrderStatus.OUT_FOR_DELIVERY);
+        Order saved = orderRepository.save(order);
+        return toResponse(saved, orderItemRepository.findByOrderId(saved.getId()));
+    }
+
     private OrderResponse toResponse(Order order, List<OrderItem> items) {
-        List<OrderItemResponse> itemResponses = items.stream()
-                .map(item -> new OrderItemResponse(item.getMenuItemId(), item.getQuantity(), item.getUnitPrice()))
-                .toList();
+        List<OrderItemResponse> itemResponses = toOrderItemResponses(items);
         return new OrderResponse(
                 order.getId(),
                 order.getCustomerId(),
@@ -188,6 +266,30 @@ public class OrderServiceImpl implements OrderService {
                 order.getStatus(),
                 itemResponses
         );
+    }
+
+    private NearbyOrderResponse toNearbyOrderResponse(Order order, List<OrderItem> items, Restaurant restaurant) {
+        if (restaurant == null) {
+            throw new NotFoundException("Restaurant not found for order: " + order.getId());
+        }
+        return new NearbyOrderResponse(
+                order.getId(),
+                order.getCustomerId(),
+                order.getRestaurantId(),
+                restaurant.getName(),
+                restaurant.getLatitude(),
+                restaurant.getLongitude(),
+                order.getDeliveryPartnerId(),
+                order.getTotalAmount(),
+                order.getStatus(),
+                toOrderItemResponses(items)
+        );
+    }
+
+    private List<OrderItemResponse> toOrderItemResponses(List<OrderItem> items) {
+        return items.stream()
+                .map(item -> new OrderItemResponse(item.getMenuItemId(), item.getQuantity(), item.getUnitPrice()))
+                .toList();
     }
 }
 
