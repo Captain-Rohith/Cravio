@@ -69,6 +69,15 @@ public class OrderController {
         ));
     }
 
+    @GetMapping("/delivery/accepted")
+    @PreAuthorize("hasRole('DELIVERY_PARTNER')")
+    public ResponseEntity<ApiResponse<List<OrderResponse>>> acceptedOrders(Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Accepted delivery orders fetched",
+                orderService.getAcceptedOrdersByDeliveryPartner(authentication.getName())
+        ));
+    }
+
     @PatchMapping("/{orderId}/claim")
     @PreAuthorize("hasRole('DELIVERY_PARTNER')")
     public ResponseEntity<ApiResponse<OrderResponse>> claimOrder(

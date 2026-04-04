@@ -20,6 +20,13 @@ public class Order {
 
     private Long deliveryPartnerId;
 
+    @Column(length = 512)
+    private String deliveryAddress;
+
+    private Double deliveryLatitude;
+
+    private Double deliveryLongitude;
+
     @Column(nullable = false)
     private double totalAmount;
 
@@ -73,6 +80,30 @@ public class Order {
         this.deliveryPartnerId = deliveryPartnerId;
     }
 
+    public String getDeliveryAddress() {
+        return deliveryAddress;
+    }
+
+    public void setDeliveryAddress(String deliveryAddress) {
+        this.deliveryAddress = deliveryAddress;
+    }
+
+    public Double getDeliveryLatitude() {
+        return deliveryLatitude;
+    }
+
+    public void setDeliveryLatitude(Double deliveryLatitude) {
+        this.deliveryLatitude = deliveryLatitude;
+    }
+
+    public Double getDeliveryLongitude() {
+        return deliveryLongitude;
+    }
+
+    public void setDeliveryLongitude(Double deliveryLongitude) {
+        this.deliveryLongitude = deliveryLongitude;
+    }
+
     public double getTotalAmount() {
         return totalAmount;
     }
@@ -87,6 +118,14 @@ public class Order {
 
     public void setStatus(OrderStatus status) {
         this.status = status;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
     }
 }
 

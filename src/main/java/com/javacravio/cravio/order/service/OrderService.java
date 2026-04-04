@@ -17,6 +17,8 @@ public interface OrderService {
 
     List<OrderResponse> getRestaurantOrders(Long restaurantId);
 
+    List<OrderResponse> getAcceptedOrdersByDeliveryPartner(String deliveryPartnerEmail);
+
     List<NearbyOrderResponse> getNearbyAvailableOrders(double latitude, double longitude);
 
     OrderResponse updateStatus(Long orderId, OrderStatus status);

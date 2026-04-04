@@ -85,6 +85,9 @@ public class OrderServiceImpl implements OrderService {
         Order order = new Order();
         order.setCustomerId(request.customerId());
         order.setRestaurantId(request.restaurantId());
+        order.setDeliveryAddress(request.deliveryAddress());
+        order.setDeliveryLatitude(request.deliveryLatitude());
+        order.setDeliveryLongitude(request.deliveryLongitude());
         order.setStatus(OrderStatus.PAYMENT_PENDING);
         order.setTotalAmount(0);
         Order savedOrder = orderRepository.save(order);
@@ -131,6 +134,20 @@ public class OrderServiceImpl implements OrderService {
             throw new NotFoundException("Restaurant not found");
         }
         return orderRepository.findByRestaurantId(restaurantId).stream()
+                .map(order -> toResponse(order, orderItemRepository.findByOrderId(order.getId())))
+                .toList();
+    }
+
+    @Override
+    public List<OrderResponse> getAcceptedOrdersByDeliveryPartner(String deliveryPartnerEmail) {
+        User deliveryPartner = userRepository.findByEmail(deliveryPartnerEmail)
+                .orElseThrow(() -> new NotFoundException("Delivery partner not found"));
+
+        if (deliveryPartner.getRole() != Role.DELIVERY_PARTNER) {
+            throw new BusinessException("Only delivery partners can access accepted orders");
+        }
+
+        return orderRepository.findByDeliveryPartnerIdOrderByUpdatedAtDesc(deliveryPartner.getId()).stream()
                 .map(order -> toResponse(order, orderItemRepository.findByOrderId(order.getId())))
                 .toList();
     }
@@ -299,13 +316,23 @@ public class OrderServiceImpl implements OrderService {
 
     private OrderResponse toResponse(Order order, List<OrderItem> items) {
         List<OrderItemResponse> itemResponses = toOrderItemResponses(items);
+        Restaurant restaurant = restaurantRepository.findById(order.getRestaurantId()).orElse(null);
+        Double restaurantLatitude = restaurant != null ? restaurant.getLatitude() : null;
+        Double restaurantLongitude = restaurant != null ? restaurant.getLongitude() : null;
         return new OrderResponse(
                 order.getId(),
                 order.getCustomerId(),
                 order.getRestaurantId(),
                 order.getDeliveryPartnerId(),
+                order.getDeliveryAddress(),
+                order.getDeliveryLatitude(),
+                order.getDeliveryLongitude(),
+                restaurantLatitude,
+                restaurantLongitude,
                 order.getTotalAmount(),
                 order.getStatus(),
+                order.getCreatedAt(),
+                order.getUpdatedAt(),
                 itemResponses
         );
     }

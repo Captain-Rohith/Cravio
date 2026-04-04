@@ -1,6 +1,6 @@
-package com.javacravio.tracking.dto;
+package com.javacravio.cravio.tracking.dto;
 
-public record TrackingEvent(
+public record TrackingEventResponse(
         Long orderId,
         Long deliveryPartnerId,
         Long customerId,
@@ -9,4 +9,3 @@ public record TrackingEvent(
         String h3Index
 ) {
 }
-
