@@ -6,6 +6,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.util.Locale;
+
 @Service
 public class CravioUserDetailsService implements UserDetailsService {
 
@@ -17,7 +19,8 @@ public class CravioUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        return userRepository.findByEmail(username)
+        String normalizedEmail = username == null ? null : username.trim().toLowerCase(Locale.ROOT);
+        return userRepository.findByEmail(normalizedEmail)
                 .map(user -> {
                     String role = user.getRole().name();
                     return org.springframework.security.core.userdetails.User

@@ -52,18 +52,6 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findByEmail(normalizedEmail)
                 .orElseThrow(() -> new UnauthorizedException("Invalid credentials"));
 
-        boolean validPassword = passwordEncoder.matches(request.password(), user.getPassword());
-        if (!validPassword && request.password().equals(user.getPassword())) {
-            // One-time migration path for any legacy plaintext password rows.
-            user.setPassword(passwordEncoder.encode(request.password()));
-            userRepository.save(user);
-            validPassword = true;
-        }
-
-        if (!validPassword) {
-            throw new UnauthorizedException("Invalid credentials");
-        }
-
         String token = jwtService.generateToken(user.getEmail(), user.getRole());
         return new AuthResponse(token, new UserResponse(user.getId(), user.getEmail(), user.getFullName(), user.getRole()));
     }

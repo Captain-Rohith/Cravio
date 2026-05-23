@@ -26,30 +26,70 @@ import static org.springframework.security.config.Customizer.withDefaults;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthFilter jwtAuthFilter, AuthenticationProvider provider) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            JwtAuthFilter jwtAuthFilter,
+            AuthenticationProvider provider
+    ) throws Exception {
+
         return http
+                // 🔴 Disable CSRF for REST APIs
                 .csrf(csrf -> csrf.disable())
+
+                // ✅ Enable CORS
                 .cors(withDefaults())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .exceptionHandling(exceptions -> exceptions
-                        .authenticationEntryPoint(unauthorizedEntryPoint())
+
+                // 🔴 Stateless session (JWT)
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
-                .authenticationProvider(provider)
+
+                // 🔴 Handle unauthorized properly
+                .exceptionHandling(exceptions ->
+                        exceptions.authenticationEntryPoint(unauthorizedEntryPoint())
+                )
+
+                // 🔥 AUTHORIZATION RULES
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/auth/**", "/swagger-ui.html", "/swagger-ui/**", "/api/v1/docs/**", "/actuator/health").permitAll()
+
+                        // ✅ Allow preflight
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                        // 🔥 CRITICAL: Allow auth endpoints
+                        .requestMatchers("/v1/auth/**").permitAll()
+
+                        // ✅ Swagger + health
+                        .requestMatchers(
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/api/v1/docs/**",
+                                "/actuator/health"
+                        ).permitAll()
+
+                        // ✅ Public restaurant listing
                         .requestMatchers(HttpMethod.GET, "/api/v1/restaurants/**").permitAll()
-                        .anyRequest().authenticated())
+
+                        // 🔴 Everything else secured
+                        .anyRequest().authenticated()
+                )
+
+                // 🔥 Attach JWT filter
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+
                 .build();
     }
 
     @Bean
     public AuthenticationEntryPoint unauthorizedEntryPoint() {
-        return (request, response, authException) -> response.sendError(401, "Unauthorized");
+        return (request, response, authException) ->
+                response.sendError(401, "Unauthorized");
     }
 
     @Bean
-    public AuthenticationProvider authenticationProvider(UserDetailsService userDetailsService, PasswordEncoder passwordEncoder) {
+    public AuthenticationProvider authenticationProvider(
+            UserDetailsService userDetailsService,
+            PasswordEncoder passwordEncoder
+    ) {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService);
         provider.setPasswordEncoder(passwordEncoder);
         return provider;
@@ -61,8 +101,9 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
+    public AuthenticationManager authenticationManager(
+            AuthenticationConfiguration configuration
+    ) throws Exception {
         return configuration.getAuthenticationManager();
     }
 }
-

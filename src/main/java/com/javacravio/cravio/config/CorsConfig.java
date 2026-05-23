@@ -7,7 +7,6 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.Arrays;
 import java.util.List;
 
 @Configuration
@@ -15,12 +14,19 @@ public class CorsConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource(
-            @Value("${cravio.cors.allowed-origins:http://localhost:3000}") String allowedOrigins) {
-        CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(Arrays.stream(allowedOrigins.split(","))
+            @Value("${cravio.cors.allowed-origins:http://localhost:3000,https://cravio.tech}") String allowedOrigins) {
+        List<String> allowedOriginList = allowedOrigins == null
+                ? List.of("http://localhost:3000")
+                : allowedOrigins
+                .lines()
+                .flatMap(line -> java.util.Arrays.stream(line.split(",")))
                 .map(String::trim)
                 .filter(value -> !value.isBlank())
-                .toList());
+                .distinct()
+                .toList();
+
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(allowedOriginList.isEmpty() ? List.of("http://localhost:3000") : allowedOriginList);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
@@ -31,4 +37,3 @@ public class CorsConfig {
         return source;
     }
 }
-
