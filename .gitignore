@@ -4,6 +4,7 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+ORACLE_JDBC_FIX.md
 ### STS ###
 .apt_generated
 .classpath
@@ -18,7 +19,8 @@ target/
 *.iws
 *.iml
 *.ipr
-
+/.mvn/
+/.idea/
 ### NetBeans ###
 /nbproject/private/
 /nbbuild/
@@ -31,3 +33,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+mvnw
+mvnw.cmdubuntu@129.159.21.6
