@@ -56,7 +56,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
                         // 🔥 CRITICAL: Allow auth endpoints
-                        .requestMatchers("/v1/auth/**").permitAll()
+                        .requestMatchers("/api/v1/auth/**").permitAll()
 
                         // ✅ Swagger + health
                         .requestMatchers(

@@ -35,10 +35,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
-        String path = request.getRequestURI();
+        String path = resolveRequestPath(request);
 
-        // 🔥 CRITICAL: allow auth endpoints
-        if (path.contains("/v1/auth")) {
+        // 🔥 CRITICAL: allow public endpoints
+        if (isPublicPath(path, request.getMethod())) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -85,12 +85,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         return requestUri == null ? "" : requestUri;
     }
 
-    private boolean isPublicPath(String path) {
+    private boolean isPublicPath(String path, String method) {
+        boolean isRestaurantGet = HttpMethod.GET.matches(method) && path.startsWith("/api/v1/restaurants");
         return path.startsWith("/api/v1/auth")
                 || path.startsWith("/swagger-ui")
                 || path.startsWith("/api/v1/docs")
                 || path.equals("/swagger-ui.html")
                 || path.equals("/actuator/health")
-                || path.startsWith("/api/v1/restaurants");
+                || isRestaurantGet;
     }
 }
